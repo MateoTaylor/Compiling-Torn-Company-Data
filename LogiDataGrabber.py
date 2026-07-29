@@ -12,8 +12,8 @@ def pull_company_info(company_type:int ): # pull all companies of a certain type
     response = requests.get("https://api.torn.com/company/"+ str(company_type) + "?selections=companies&key=" + API_KEY)
     all_companies = json.loads(response.text)
     x8_to_10_companies = []
-    for company_id, company_info in all_companies['company'].items():
-        if company_info['rating'] >= 8:
+    for company_info in all_companies['company']:
+        if company_info['rating'] == 9: # if this is a 8-10* company, pull its info
             company_setup = find_company_setups(company_info["ID"])
             company_info.update(company_setup) # adding our employee setup to the data
             x8_to_10_companies.append(company_info) # appending it to our larger list
@@ -24,16 +24,19 @@ def pull_company_info(company_type:int ): # pull all companies of a certain type
 
 def find_company_setups(company_id:int):
     response = requests.get("https://api.torn.com/company/" + str(company_id) + "?selections=employees&key=" + API_KEY)
+    if response.status_code != 200:
+        print(f"Error: {response.status_code} - {response.text}")
+        return None
     this_company = json.loads(response.text)
     company_positions = {
-        "Lumper": 0,
-        "Driver": 0,
-        "Forklift Operator": 0,
-        "Transport Coordinator": 0,
-        "Warehouse Manager": 0,
-        "Shift Manager": 0,
-        "Supply Chain Manager": 0,
-        "Procurement Manager": 0
+        "Driller": 0,
+        "Roughneck": 0,
+        "Derrick Hand": 0,
+        "Sales Executive": 0,
+        "Motor Hand": 0,
+        "Inspector": 0,
+        "Secretary": 0,
+        "Unassigned": 0,
     }
     for employee_id, employee_info in this_company['company_employees'].items():
         company_positions[employee_info["position"]] += 1
@@ -42,8 +45,11 @@ def find_company_setups(company_id:int):
 def access_sheets(): # pull our google sheet
     google_sheets = pygsheets.authorize(service_file='SheetSettingsAPI.json')
     spreadsheet = google_sheets.open('Compiled Logistics Data')
-    spreadsheet.add_worksheet(datetime.now().strftime("%m/%d/%y")) # putting today's data into a new sheet
-    return spreadsheet.worksheet_by_title(datetime.now().strftime("%m/%d/%y"))
+    try:
+        worksheet = spreadsheet.worksheet_by_title(datetime.now().strftime("%m/%d/%y"))
+    except pygsheets.WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(datetime.now().strftime("%m/%d/%y")) # putting today's data into a new sheet
+    return worksheet
 
 def upload_to_sheet(sheet:pygsheets.Worksheet, x8_to_10_companies: pd.DataFrame):
     assert type(x8_to_10_companies) == pd.DataFrame
@@ -51,6 +57,7 @@ def upload_to_sheet(sheet:pygsheets.Worksheet, x8_to_10_companies: pd.DataFrame)
 
 
 if __name__ == "__main__":  
-    upload_to_sheet(access_sheets(),pull_company_info(40))
+    upload_to_sheet(access_sheets(),pull_company_info(28))
+    print('done grabbing data')
 
 # Goal: Pull all 8-10* Logistics companies into a spreadsheet.
